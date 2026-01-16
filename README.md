@@ -15,13 +15,14 @@
   - [Test 5: The Nuclear Option](#test-5-the-nuclear-option)
   - [Test 5b: Sandbox Home Directory Contents](#test-5b-sandbox-home-directory-contents)
   - [Test 6: Verify Git Identity Injection](#test-6-verify-git-identity-injection)
-- [Test State Persistence](#test-7-state-persistence)
+- [Test Path Matching](#test-7-path-matching)
+- [Test State Persistence](#test-8-state-persistence)
   - [Step 1: Install a Package](#step-1-install-a-package)
   - [Step 2: Exit the Sandbox](#step-2-exit-the-sandbox)
   - [Step 3: Re-enter and Verify](#step-3-re-enter-and-verify)
-- [Test Environment Variables](#test-8-environment-variables)
-- [Test Docker Socket Access](#test-9-docker-socket-access)
-- [Real-World Demo: Playwright Browser Testing](#test-10-real-world-demo---playwright-browser-testing)
+- [Test Environment Variables](#test-9-environment-variables)
+- [Test Docker Socket Access](#test-10-docker-socket-access)
+- [Real-World Demo: Playwright Browser Testing](#test-11-real-world-demo---playwright-browser-testing)
 - [Test Summary](#test-summary)
 - [Key Takeaways](#key-takeaways)
 
@@ -310,7 +311,190 @@ safe.directory=/Users/ajeetsraina/meetup-jan/sandbox-testing
 
 ---
 
-## Test 7: State Persistence
+## Test 7: Path Matching
+
+Path matching ensures that file paths are **identical** inside and outside the sandbox. This is crucial for:
+
+- Error messages that make sense
+- Copy-paste paths that work
+- IDE integration
+- Git path consistency
+
+### Why Path Matching Matters
+
+| Without Path Matching | With Path Matching (Docker Sandboxes) |
+|----------------------|---------------------------------------|
+| Host: `/Users/ajeet/project/src/Button.tsx` | Host: `/Users/ajeet/project/src/Button.tsx` |
+| Container: `/workspace/src/Button.tsx` | Container: `/Users/ajeet/project/src/Button.tsx` ✅ |
+| Error messages show `/workspace/...` — confusing! | Error messages show real paths |
+| Copy-paste paths don't work | Copy-paste paths work |
+
+### Step 1: Create a File on HOST
+
+```bash
+# On your host terminal
+mkdir -p ~/meetup-jan/sandbox-testing/src/components
+echo "export const Button = () => <button>Click me</button>" > ~/meetup-jan/sandbox-testing/src/components/Button.tsx
+```
+
+Verify it exists:
+
+```bash
+cat ~/meetup-jan/sandbox-testing/src/components/Button.tsx
+```
+
+**Result:**
+
+```
+export const Button = () => <button>Click me</button>
+```
+
+### Step 2: Start the Sandbox
+
+```bash
+cd ~/meetup-jan/sandbox-testing
+docker sandbox run claude
+```
+
+### Step 3: Access File Using FULL PATH Inside Sandbox
+
+Inside the sandbox, use the exact same path as your host:
+
+```bash
+cat /Users/ajeetsraina/meetup-jan/sandbox-testing/src/components/Button.tsx
+```
+
+**Result:**
+
+```
+● Bash(cat /Users/ajeetsraina/meetup-jan/sandbox-testing/src/components/Button.tsx)
+  ⎿  export const Button = () => <button>Click me</button>
+```
+
+✅ **Same path works inside the sandbox!**
+
+### Step 4: Verify Working Directory
+
+```bash
+pwd
+```
+
+**Result:**
+
+```
+● Bash(pwd)
+  ⎿  /Users/ajeetsraina/meetup-jan/sandbox-testing
+```
+
+✅ **Working directory matches your host path!**
+
+### Step 5: Access with Relative Path
+
+```bash
+cat src/components/Button.tsx
+```
+
+**Result:**
+
+```
+● Bash(cat src/components/Button.tsx)
+  ⎿  export const Button = () => <button>Click me</button>
+```
+
+✅ **Relative paths work too!**
+
+### Step 6: Create a File INSIDE Sandbox
+
+Create a new file using the full path:
+
+```bash
+echo "console.log('created inside sandbox')" > /Users/ajeetsraina/meetup-jan/sandbox-testing/src/utils.js
+```
+
+Verify inside sandbox:
+
+```bash
+cat /Users/ajeetsraina/meetup-jan/sandbox-testing/src/utils.js
+```
+
+**Result:**
+
+```
+● Bash(cat /Users/ajeetsraina/meetup-jan/sandbox-testing/src/utils.js)
+  ⎿  console.log('created inside sandbox')
+```
+
+### Step 7: Verify File Exists on HOST
+
+Exit the sandbox:
+
+```bash
+exit
+```
+
+Check on your host:
+
+```bash
+cat ~/meetup-jan/sandbox-testing/src/utils.js
+```
+
+**Result:**
+
+```
+console.log('created inside sandbox')
+```
+
+✅ **File created inside sandbox appears on host at the same path!**
+
+### Visual Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    REGULAR DOCKER CONTAINER                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  HOST                              CONTAINER                            │
+│  /Users/ajeet/project/             /workspace/                          │
+│  ├── src/                          ├── src/                             │
+│  │   └── app.js                    │   └── app.js                       │
+│  └── package.json                  └── package.json                     │
+│                                                                         │
+│  ❌ Paths are DIFFERENT                                                 │
+│  ❌ Error: "File not found at /workspace/src/app.js"                    │
+│  ❌ You think: "Where is /workspace? That's not my path!"               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      DOCKER SANDBOXES                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  HOST                              SANDBOX                              │
+│  /Users/ajeet/project/             /Users/ajeet/project/                │
+│  ├── src/                          ├── src/                             │
+│  │   └── app.js                    │   └── app.js                       │
+│  └── package.json                  └── package.json                     │
+│                                                                         │
+│  ✅ Paths are IDENTICAL                                                 │
+│  ✅ Error: "File not found at /Users/ajeet/project/src/app.js"          │
+│  ✅ You think: "I know exactly where that is!"                          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Path Matching Summary
+
+| Test | Result |
+|------|--------|
+| Full path access from sandbox | ✅ Working |
+| Working directory matches host | ✅ Working |
+| Relative paths work | ✅ Working |
+| Files created in sandbox appear on host | ✅ Working |
+| Files created on host appear in sandbox | ✅ Working |
+
+---
+
+## Test 8: State Persistence
 
 ### Step 1: Install a Package
 
@@ -370,7 +554,7 @@ Unlike a regular `docker run` (which loses everything on exit), Docker Sandbox *
 
 ---
 
-## Test 8: Environment Variables
+## Test 9: Environment Variables
 
 Environment variables must be set at sandbox creation time.
 
@@ -425,7 +609,7 @@ printenv | grep -E "MY_SECRET|APP_ENV"
 
 ---
 
-## Test 9: Docker Socket Access
+## Test 10: Docker Socket Access
 
 This allows the agent to run Docker commands inside the sandbox.
 
@@ -484,7 +668,7 @@ The agent can now:
 
 ---
 
-## Test 10: Real-World Demo - Playwright Browser Testing
+## Test 11: Real-World Demo - Playwright Browser Testing
 
 This demonstrates a practical use case: running browser tests in the sandbox without polluting your host system.
 
@@ -591,7 +775,7 @@ ls ~/.cache/ms-playwright/
 | 🔧 Environment variables | Available | ✅ Working |
 | 🐳 Docker socket access | With sudo | ✅ Working |
 | 🎭 Playwright isolation | Browsers isolated | ✅ Working |
-
+| 🪪 Git identity injection | Auto-injected | ⚠️ Not working |
 
 ---
 
