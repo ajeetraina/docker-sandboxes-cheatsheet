@@ -306,7 +306,7 @@ git config --global --list
 safe.directory=/Users/ajeetsraina/meetup-jan/sandbox-testing
 ```
 
-⚠️ **Note:** Git identity (`user.name`, `user.email`) was not auto-injected despite being configured on the host. This may be a bug worth reporting to `coding-sandboxes-feedback@docker.com`.
+⚠️ **Note:** Git identity (`user.name`, `user.email`) was not auto-injected despite being configured on the host. Will work with Sandboxes team and get it fixed.
 
 ---
 
@@ -591,7 +591,7 @@ ls ~/.cache/ms-playwright/
 | 🔧 Environment variables | Available | ✅ Working |
 | 🐳 Docker socket access | With sudo | ✅ Working |
 | 🎭 Playwright isolation | Browsers isolated | ✅ Working |
-| 🪪 Git identity injection | Auto-injected | ⚠️ Not working |
+
 
 ---
 
